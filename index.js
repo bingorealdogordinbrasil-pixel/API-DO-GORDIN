@@ -1,47 +1,48 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => res.send('API API-DO-GORDIN Ativa!'));
+// Sua chave adicionada com sucesso
+const MINHA_CHAVE = "4a55a7bee4c840678777337e86f8431a";
+
+app.get('/', (req, res) => res.send('API-DO-GORDIN: Online e recebendo dados!'));
 
 app.get('/jogos', async (req, res) => {
     try {
-        // Usando o Flashscore (via simulação de navegador para não ser bloqueado)
-        const { data } = await axios.get('https://www.resultados.com/', {
+        const response = await axios.get('https://v3.football.api-sports.io/fixtures', {
+            params: {
+                live: 'all' // Puxa todos os jogos que estão rolando AGORA
+            },
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+                'x-rapidapi-key': MINHA_CHAVE,
+                'x-rapidapi-host': 'v3.football.api-sports.io'
             }
         });
 
-        const $ = cheerio.load(data);
-        const partidas = [];
-
-        // Lógica para pegar os nomes dos times
-        // Nota: Sites grandes mudam as classes sempre. 
-        // Se retornar vazio, precisamos mapear a classe exata do dia.
-        $('.event__match').each((i, el) => {
-            partidas.push({
-                casa: $(el).find('.event__participant--home').text(),
-                fora: $(el).find('.event__participant--away').text(),
-                placar: $(el).find('.event__score').text()
-            });
-        });
+        const partidas = response.data.response.map(item => ({
+            id: item.fixture.id,
+            liga: item.league.name,
+            casa: item.teams.home.name,
+            fora: item.teams.away.name,
+            placar: `${item.goals.home ?? 0}x${item.goals.away ?? 0}`,
+            tempo: item.fixture.status.elapsed, // Minutos de jogo
+            status: item.fixture.status.short
+        }));
 
         res.json({
             sucesso: true,
-            timestamp: new Date().toISOString(),
+            total_ao_vivo: partidas.length,
             jogos: partidas
         });
 
     } catch (err) {
         res.status(500).json({ 
             sucesso: false, 
-            erro: "O site bloqueou a conexão ou a URL mudou",
+            erro: "Erro na comunicação com o servidor de dados",
             detalhes: err.message 
         });
     }
 });
 
-app.listen(PORT, () => console.log('Servidor ligado!'));
+app.listen(PORT, () => console.log('Servidor pronto!'));
