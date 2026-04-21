@@ -4,29 +4,44 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => res.send('API Ativa! use /jogos'));
+app.get('/', (req, res) => res.send('API API-DO-GORDIN Ativa!'));
 
 app.get('/jogos', async (req, res) => {
     try {
-        // Exemplo: Coletando de um site de resultados
-        const { data } = await axios.get('https://www.PLACAR_EXEMPLO.com', {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+        // Usando o Flashscore (via simulação de navegador para não ser bloqueado)
+        const { data } = await axios.get('https://www.resultados.com/', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+            }
         });
+
         const $ = cheerio.load(data);
         const partidas = [];
 
-        // Lógica de raspagem (ajuste conforme o site)
-        $('div.match').each((i, el) => {
+        // Lógica para pegar os nomes dos times
+        // Nota: Sites grandes mudam as classes sempre. 
+        // Se retornar vazio, precisamos mapear a classe exata do dia.
+        $('.event__match').each((i, el) => {
             partidas.push({
-                casa: $(el).find('.home').text(),
-                fora: $(el).find('.away').text()
+                casa: $(el).find('.event__participant--home').text(),
+                fora: $(el).find('.event__participant--away').text(),
+                placar: $(el).find('.event__score').text()
             });
         });
 
-        res.json(partidas);
+        res.json({
+            sucesso: true,
+            timestamp: new Date().toISOString(),
+            jogos: partidas
+        });
+
     } catch (err) {
-        res.json({ erro: "Erro ao buscar dados" });
+        res.status(500).json({ 
+            sucesso: false, 
+            erro: "O site bloqueou a conexão ou a URL mudou",
+            detalhes: err.message 
+        });
     }
 });
 
-app.listen(PORT, () => console.log('Rodando!'));
+app.listen(PORT, () => console.log('Servidor ligado!'));
