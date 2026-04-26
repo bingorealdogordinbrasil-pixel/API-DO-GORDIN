@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Visualizador Boneco</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; touch-action: none; }
+        #status {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #00ff00; font-family: monospace; text-align: center; z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="status">INICIANDO MOTOR 3D...</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 3000);
+        camera.position.set(0, 150, 400);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true }); // Antialias desligado para ganhar velocidade
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(1); // Força resolução baixa para rodar em qualquer celular
+        document.body.appendChild(renderer.domElement);
+
+        // Luzes simples
+        scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(1, 1, 1);
+        scene.add(light);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        const loader = new OBJLoader();
+        const status = document.getElementById('status');
+
+        // Carregar o .OBJ (é mais garantido que o FBX no celular)
+        loader.load('terrorist.obj', (object) => {
+            status.innerText = "PROCESSANDO...";
+            
+            object.traverse((child) => {
+                if (child.isMesh) {
+                    // Material básico sem texturas para não dar erro de memória
+                    child.material = new THREE.MeshLambertMaterial({ color: 0x888888 });
+                }
+            });
+
+            // Ajuste de escala automático
+            const box = new THREE.Box3().setFromObject(object);
+            const size = box.getSize(new THREE.Vector3()).length();
+            const scale = 250 / size;
+            object.scale.set(scale, scale, scale);
+            
+            // Centralizar
+            const center = box.getCenter(new THREE.Vector3());
+            object.position.x = -center.x * scale;
+            object.position.y = -box.min.y * scale; // Pés no nível 0
+            object.position.z = -center.z * scale;
+
+            scene.add(object);
+            status.style.display = 'none';
+        }, 
+        (xhr) => {
+            const p = Math.round((xhr.loaded / xhr.total) * 100);
+            status.innerText = `BAIXANDO BONECO: ${p}%`;
+        },
+        (err) => {
+            status.style.color = "red";
+            status.innerText = "ERRO: ARQUIVO NÃO ENCONTRADO";
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
